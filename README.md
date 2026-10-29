@@ -28,8 +28,8 @@ Abrir http://localhost:3000. Credenciales demo: usuario `admin` / contraseña `g
 | HU | Nombre | Sugerencia |
 |---|---|---|
 | HU-05 | Registrar venta en tienda | Nueva página `app/admin/ventas`. Validar stock **disponible**, bloquear vencidos/inactivos y descontar por **FEFO**. Usar `buildMovement` con tipo `venta`. |
-| HU-06 | Consultar Kardex de movimientos | Nueva página `app/admin/kardex` que lea `movements` con filtros por producto, tipo y fechas. |
-| HU-08 | Gestionar alertas de stock mínimo | Agregar `getAlertState` (bajo / agotado según stock disponible vs. stock mínimo) y página `app/admin/alertas`. |
+| HU-06 | Consultar Kardex de movimientos | `app/admin/kardex` (Historial con filtros por producto, tipo y fechas, detalle de origen) |
+| HU-08 | Gestionar alertas de stock mínimo | `app/admin/alertas` (Alertas dinámicas agotado/bajo y enlace directo a reposición) |
 | HU-09 | Productos próximos a vencer y vencidos | Página `app/admin/vencimientos`. Ya existe `lotExpiryState` (umbral 30 días). |
 | HU-10 | Dashboard de inventario | Reemplazar `app/admin/page.tsx` por el Dashboard con indicadores. |
 

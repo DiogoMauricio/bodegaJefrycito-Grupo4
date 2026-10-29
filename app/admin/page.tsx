@@ -22,6 +22,7 @@ import {
   CalendarClock,
   CheckCircle2,
   CircleDollarSign,
+  FileSpreadsheet,
   Layers,
   PackageCheck,
   PackagePlus,
@@ -201,6 +202,18 @@ export default function AdminDashboardPage() {
             <Button size="sm" variant="outline" className="gap-1.5 bg-white shadow-xs">
               <CalendarClock className="size-4" />
               Vencimientos
+            </Button>
+          </Link>
+          <Link href="/admin/alertas">
+            <Button size="sm" variant="outline" className="gap-1.5 bg-white shadow-xs">
+              <AlertTriangle className="size-4 text-amber-600" />
+              Alertas de stock
+            </Button>
+          </Link>
+          <Link href="/admin/kardex">
+            <Button size="sm" variant="outline" className="gap-1.5 bg-white shadow-xs">
+              <FileSpreadsheet className="size-4 text-blue-600" />
+              Kardex
             </Button>
           </Link>
           <Link href="/admin/inventario">

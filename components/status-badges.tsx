@@ -120,3 +120,26 @@ export function LotAvailabilityBadge({ state }: { state: ExpiryState }) {
     </span>
   )
 }
+
+
+export function StockStatusBadge({ alert }: { alert: StockAlertState }) {
+  if (alert === 'agotado') {
+    return (
+      <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+        Agotado
+      </span>
+    )
+  }
+  if (alert === 'bajo') {
+    return (
+      <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+        Stock bajo
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+      En stock
+    </span>
+  )
+}

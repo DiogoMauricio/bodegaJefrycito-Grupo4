@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Package,
   PackagePlus,
+  ShoppingCart,
   Warehouse,
   CalendarClock,
   LogOut,
@@ -29,6 +30,7 @@ const NAV: NavItem[] = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/productos', label: 'Productos', icon: Package },
   { href: '/admin/entradas', label: 'Entradas', icon: PackagePlus },
+  { href: '/admin/ventas', label: 'Punto de venta', icon: ShoppingCart },
   { href: '/admin/inventario', label: 'Inventario', icon: Warehouse },
   { href: '/admin/vencimientos', label: 'Vencimientos', icon: CalendarClock },
 ]
@@ -124,8 +126,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               A
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate font-medium text-sidebar-foreground">Administrador</p>
-              <p className="truncate text-[11px] text-sidebar-foreground/50">admin@jefrysito.pe</p>
+              <p className="truncate font-medium text-sidebar-foreground">Johann Romero</p>
+              <p className="truncate text-[11px] text-sidebar-foreground/50">johann.romero@usmp.pe</p>
             </div>
           </div>
           <button

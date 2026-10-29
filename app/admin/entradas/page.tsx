@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { PackagePlus } from 'lucide-react'
 import { useStore } from '@/lib/store'
@@ -32,12 +33,21 @@ import {
   TableRow,
 } from '@/components/ui/table'
 
-export default function EntradasPage() {
+function EntradasContent() {
   const { products, lots, registerEntry, getProduct, lotExpiryState } =
     useStore()
   const activeProducts = products.filter((p) => p.status === 'activo')
 
-  const [productId, setProductId] = useState('')
+  const searchParams = useSearchParams()
+  const paramProducto = searchParams.get('producto')
+
+  const [productId, setProductId] = useState(paramProducto || '')
+
+  useEffect(() => {
+    if (paramProducto) {
+      setProductId(paramProducto)
+    }
+  }, [paramProducto])
   const [lotCode, setLotCode] = useState('')
   const [quantity, setQuantity] = useState('')
   const [cost, setCost] = useState('')
@@ -261,5 +271,13 @@ export default function EntradasPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function EntradasPage() {
+  return (
+    <Suspense fallback={<div className="flex h-64 items-center justify-center text-sm text-muted-foreground">Cargando registro de entradas...</div>}>
+      <EntradasContent />
+    </Suspense>
   )
 }

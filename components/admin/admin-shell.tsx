@@ -10,6 +10,8 @@ import {
   ShoppingCart,
   Warehouse,
   CalendarClock,
+  AlertTriangle,
+  FileSpreadsheet,
   LogOut,
   Menu,
   X,
@@ -32,7 +34,9 @@ const NAV: NavItem[] = [
   { href: '/admin/entradas', label: 'Entradas', icon: PackagePlus },
   { href: '/admin/ventas', label: 'Punto de venta', icon: ShoppingCart },
   { href: '/admin/inventario', label: 'Inventario', icon: Warehouse },
+  { href: '/admin/alertas', label: 'Alertas de stock', icon: AlertTriangle },
   { href: '/admin/vencimientos', label: 'Vencimientos', icon: CalendarClock },
+  { href: '/admin/kardex', label: 'Kardex', icon: FileSpreadsheet },
 ]
 
 export function AdminShell({ children }: { children: React.ReactNode }) {

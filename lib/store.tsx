@@ -1,12 +1,10 @@
 'use client'
 
 // =============================================================
-// Gestock · Estado de la aplicación (Sprint 1)
+// Gestock · Estado de la aplicación (Sprint 1 & Sprint 2)
 // HU-01 Login · HU-02 Registrar producto · HU-03 Gestionar producto
 // HU-04 Entrada de mercadería · HU-07 Consultar stock actual
-//
-// NOTA: por ahora los datos viven en memoria (se reinician al recargar).
-// Aquí es donde se conectará el backend / base de datos.
+// HU-09 Lotes próximos a vencer y vencidos · HU-10 Dashboard de inventario
 // =============================================================
 
 import {
@@ -25,21 +23,31 @@ import type {
   MovementType,
   Product,
   ProductStatus,
+  StockAlertState,
   StockInfo,
 } from './types'
 
-const EXPIRY_THRESHOLD_DAYS = 30
+export const EXPIRY_THRESHOLD_DAYS = 30
 
-function uid(prefix: string) {
-  return `${prefix}-${Math.random().toString(36).slice(2, 8)}`
-}
-
-function lotExpiryState(lot: Lot): ExpiryState {
+export function lotExpiryState(lot: Lot): ExpiryState {
   if (!lot.expiry) return 'ok'
   const d = daysUntil(lot.expiry)
   if (d < 0) return 'vencido'
   if (d <= EXPIRY_THRESHOLD_DAYS) return 'proximo'
   return 'ok'
+}
+
+export function getAlertState(
+  available: number,
+  minStock: number,
+): StockAlertState {
+  if (available <= 0) return 'agotado'
+  if (available <= minStock) return 'bajo'
+  return 'ok'
+}
+
+function uid(prefix: string) {
+  return `${prefix}-${Math.random().toString(36).slice(2, 8)}`
 }
 
 type ProductInput = Omit<Product, 'id'>
@@ -80,6 +88,8 @@ type StoreContextValue = {
   setProductStatus: (id: string, status: ProductStatus) => void
   // inventory actions (HU-04)
   registerEntry: (input: EntryInput) => { ok: boolean; error?: string }
+  // HU-09: retirar lote por caducidad o merma
+  retireLot: (lotId: string, reason?: string) => { ok: boolean; error?: string }
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
@@ -106,6 +116,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     lots.filter((l) => l.productId === productId)
 
   // HU-07: stock disponible = stock físico vigente − stock reservado
+  // HU-09: Lotes vencidos no se consideran disponibles
   const getStock = (productId: string): StockInfo => {
     const productLots = lots.filter((l) => l.productId === productId)
     let physical = 0
@@ -186,7 +197,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }
 
   // ----- movement helper -----
-  // Sprint 2 reutilizará esta función para ventas y el Kardex (HU-05 / HU-06).
   const buildMovement = (
     productId: string,
     lotId: string | null,
@@ -255,6 +265,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return { ok: true }
   }
 
+  // ----- HU-09: retirar lote por caducidad / merma -----
+  const retireLot = (lotId: string, reason?: string) => {
+    const lot = lots.find((l) => l.id === lotId)
+    if (!lot) return { ok: false, error: 'Lote no encontrado.' }
+    if (lot.quantity <= 0) {
+      return { ok: false, error: 'El lote ya no cuenta con unidades disponibles.' }
+    }
+    const qty = lot.quantity
+    const balanceBefore = getStock(lot.productId).physical
+    setLots((prev) =>
+      prev.map((l) => (l.id === lotId ? { ...l, quantity: 0 } : l)),
+    )
+    setMovements((prev) => [
+      ...prev,
+      buildMovement(
+        lot.productId,
+        lot.id,
+        lot.code,
+        'merma',
+        0,
+        qty,
+        Math.max(balanceBefore - qty, 0),
+        reason || `Baja por caducidad · Lote ${lot.code}`,
+      ),
+    ])
+    return { ok: true }
+  }
+
   const value: StoreContextValue = {
     isAuthenticated,
     login,
@@ -272,6 +310,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     updateProduct,
     setProductStatus,
     registerEntry,
+    retireLot,
   }
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

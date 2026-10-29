@@ -65,3 +65,6 @@ export type StockInfo = {
 }
 
 export type ExpiryState = 'ok' | 'proximo' | 'vencido'
+
+export type StockAlertState = 'ok' | 'bajo' | 'agotado'
+

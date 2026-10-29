@@ -3,7 +3,8 @@
 // =============================================================
 // Gestock · Estado de la aplicación (Sprint 1 & Sprint 2)
 // HU-01 Login · HU-02 Registrar producto · HU-03 Gestionar producto
-// HU-04 Entrada de mercadería · HU-07 Consultar stock actual
+// HU-04 Entrada de mercadería · HU-05 Punto de venta (FEFO)
+// HU-07 Consultar stock actual · HU-08 Alertas de stock
 // HU-09 Lotes próximos a vencer y vencidos · HU-10 Dashboard de inventario
 // =============================================================
 
@@ -23,6 +24,8 @@ import type {
   MovementType,
   Product,
   ProductStatus,
+  SaleLine,
+  SaleResult,
   StockAlertState,
   StockInfo,
 } from './types'
@@ -77,6 +80,7 @@ type StoreContextValue = {
   // selectors
   getProduct: (id: string) => Product | undefined
   getStock: (productId: string) => StockInfo
+  getAlertState: (productId: string) => StockAlertState
   lotExpiryState: (lot: Lot) => ExpiryState
   getProductLots: (productId: string) => Lot[]
   // product actions (HU-02 / HU-03)
@@ -88,6 +92,8 @@ type StoreContextValue = {
   setProductStatus: (id: string, status: ProductStatus) => void
   // inventory actions (HU-04)
   registerEntry: (input: EntryInput) => { ok: boolean; error?: string }
+  // sales action (HU-05) - FEFO
+  registerSale: (lines: SaleLine[]) => SaleResult
   // HU-09: retirar lote por caducidad o merma
   retireLot: (lotId: string, reason?: string) => { ok: boolean; error?: string }
 }
@@ -131,6 +137,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const reserved = 0
     const available = Math.max(vigente - reserved, 0)
     return { physical, vigente, reserved, available, expired }
+  }
+
+  const getProductAlertState = (productId: string): StockAlertState => {
+    const product = getProduct(productId)
+    if (!product) return 'ok'
+    const { available } = getStock(productId)
+    return getAlertState(available, product.minStock)
   }
 
   // ----- auth (HU-01) -----
@@ -265,6 +278,94 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return { ok: true }
   }
 
+  // ----- sales action (HU-05: Punto de venta con algoritmo FEFO) -----
+  const registerSale = (lines: SaleLine[]): SaleResult => {
+    if (lines.length === 0) {
+      return { ok: false, error: 'El ticket de venta no contiene productos.' }
+    }
+
+    // Validación previa de todos los productos en el ticket
+    for (const line of lines) {
+      const product = getProduct(line.productId)
+      if (!product) {
+        return { ok: false, error: 'Producto no encontrado.' }
+      }
+      // Criterio 4: Si el producto está inactivo, bloquea su venta
+      if (product.status !== 'activo') {
+        return { ok: false, error: `"${product.name}" está inactivo y no se puede vender.` }
+      }
+      if (line.qty <= 0) {
+        return { ok: false, error: `Cantidad inválida para "${product.name}".` }
+      }
+      const stock = getStock(line.productId)
+      // Criterio 2 y 3: Validar contra stock disponible (físico vigente - reservado)
+      if (line.qty > stock.available) {
+        return {
+          ok: false,
+          error: `Stock insuficiente para "${product.name}". Disponible: ${stock.available}.`,
+        }
+      }
+    }
+
+    const reference = `V-${Math.floor(1000 + Math.random() * 9000)}`
+    const updatedLots = [...lots]
+    const newMovements: Movement[] = []
+    const details: { productName: string; lotCode: string; qty: number }[] = []
+
+    for (const line of lines) {
+      const product = getProduct(line.productId)!
+      let remaining = line.qty
+
+      // Criterio 4 y 5: FEFO (First Expired, First Out)
+      // Solo lotes vigentes (no vencidos), ordenados por fecha de vencimiento más próxima
+      const vigenteLots = updatedLots
+        .filter(
+          (l) =>
+            l.productId === line.productId &&
+            l.quantity > 0 &&
+            lotExpiryState(l) !== 'vencido',
+        )
+        .sort((a, b) => {
+          const da = a.expiry ? new Date(a.expiry).getTime() : Infinity
+          const db = b.expiry ? new Date(b.expiry).getTime() : Infinity
+          return da - db
+        })
+
+      let runningBalance = getStock(line.productId).physical
+      for (const lot of vigenteLots) {
+        if (remaining <= 0) break
+        const take = Math.min(lot.quantity, remaining)
+        const idx = updatedLots.findIndex((l) => l.id === lot.id)
+        updatedLots[idx] = { ...lot, quantity: lot.quantity - take }
+        remaining -= take
+        runningBalance -= take
+
+        details.push({
+          productName: product.name,
+          lotCode: lot.code,
+          qty: take,
+        })
+
+        newMovements.push(
+          buildMovement(
+            line.productId,
+            lot.id,
+            lot.code,
+            'venta',
+            0,
+            take,
+            runningBalance,
+            `Venta mostrador ${reference} (FEFO · Lote ${lot.code})`,
+          ),
+        )
+      }
+    }
+
+    setLots(updatedLots)
+    setMovements((prev) => [...prev, ...newMovements])
+    return { ok: true, reference, details }
+  }
+
   // ----- HU-09: retirar lote por caducidad / merma -----
   const retireLot = (lotId: string, reason?: string) => {
     const lot = lots.find((l) => l.id === lotId)
@@ -304,12 +405,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     movements,
     getProduct,
     getStock,
+    getAlertState: getProductAlertState,
     lotExpiryState,
     getProductLots,
     addProduct,
     updateProduct,
     setProductStatus,
     registerEntry,
+    registerSale,
     retireLot,
   }
 

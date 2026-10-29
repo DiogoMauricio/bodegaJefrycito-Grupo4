@@ -68,3 +68,21 @@ export type ExpiryState = 'ok' | 'proximo' | 'vencido'
 
 export type StockAlertState = 'ok' | 'bajo' | 'agotado'
 
+// HU-05: Registrar venta en tienda (Punto de venta)
+export type SaleLine = {
+  productId: string
+  qty: number
+}
+
+export type SaleResult = {
+  ok: boolean
+  reference?: string
+  error?: string
+  details?: {
+    productName: string
+    lotCode: string
+    qty: number
+  }[]
+}
+
+

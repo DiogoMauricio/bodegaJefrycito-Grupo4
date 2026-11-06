@@ -1,10 +1,11 @@
-import type { Lot, Movement, Product } from './types'
-import { daysFromNowISO } from './format'
+import type { Lot, Movement, Product, Reservation } from './types'
+import { daysFromNowISO, hoursFromNowISO } from './format'
 
 export type InitialState = {
   products: Product[]
   lots: Lot[]
   movements: Movement[]
+  reservations: Reservation[]
 }
 
 export function buildInitialState(): InitialState {
@@ -124,5 +125,35 @@ export function buildInitialState(): InitialState {
     { id: 'm5', date: daysFromNowISO(-10), productId: 'p3', lotId: 'l4', lotCode: 'AC-2404', type: 'entrada', in: 24, out: 0, balance: 34, reference: 'Entrada F003-0511' },
   ]
 
-  return { products, lots, movements }
+  const reservations: Reservation[] = [
+    {
+      id: 'r1',
+      code: 'RSV-2048',
+      customer: 'María Quispe',
+      phone: '987 654 321',
+      note: 'Paso a recoger en la tarde.',
+      items: [
+        { productId: 'p1', name: 'Agua Mineral San Luis 625ml', qty: 6, price: 1.5 },
+        { productId: 'p5', name: 'Inca Kola 1.5L', qty: 2, price: 7.5 },
+      ],
+      total: 24.0,
+      createdAt: hoursFromNowISO(-3),
+      expiresAt: hoursFromNowISO(21),
+      status: 'pendiente',
+    },
+    {
+      id: 'r2',
+      code: 'RSV-2049',
+      customer: 'Jorge Ramírez',
+      phone: '956 112 233',
+      note: '',
+      items: [{ productId: 'p3', name: 'Aceite Primor 1L', qty: 3, price: 9.8 }],
+      total: 29.4,
+      createdAt: hoursFromNowISO(-1),
+      expiresAt: hoursFromNowISO(23),
+      status: 'confirmada',
+    },
+  ]
+
+  return { products, lots, movements, reservations }
 }

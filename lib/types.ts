@@ -1,6 +1,5 @@
 // =============================================================
-// Gestock · Tipos base (Sprint 1)
-// Sprint 2 y 3 extenderán estos tipos (ventas, alertas, reservas…)
+// Gestock · Tipos base (Sprint 1, Sprint 2 & Sprint 3)
 // =============================================================
 
 export type ProductStatus = 'activo' | 'inactivo'
@@ -31,9 +30,7 @@ export type Lot = {
   voucher: string
 }
 
-// Tipos de movimiento de inventario.
-// En Sprint 1 solo se generan movimientos de tipo 'entrada' (HU-04).
-// El resto se usará en Sprint 2 (venta, Kardex HU-06) y Sprint 3 (reserva, liberación, ajuste).
+// Tipos de movimiento de inventario
 export type MovementType =
   | 'entrada'
   | 'venta'
@@ -55,11 +52,43 @@ export type Movement = {
   reference: string
 }
 
+// HU-14 / HU-15 / HU-12: Reservas y Carrito
+export type ReservationStatus =
+  | 'pendiente'
+  | 'confirmada'
+  | 'rechazada'
+  | 'expirada'
+
+export type ReservationItem = {
+  productId: string
+  name: string
+  qty: number
+  price: number
+}
+
+export type Reservation = {
+  id: string
+  code: string
+  customer: string
+  phone: string
+  note: string
+  items: ReservationItem[]
+  total: number
+  createdAt: string
+  expiresAt: string
+  status: ReservationStatus
+}
+
+export type CartItem = {
+  productId: string
+  qty: number
+}
+
 // HU-07: stock físico, reservado y disponible
 export type StockInfo = {
   physical: number // todas las unidades existentes
   vigente: number // unidades no vencidas
-  reserved: number // unidades comprometidas por reservas (Sprint 3; por ahora siempre 0)
+  reserved: number // unidades comprometidas por reservas activas
   available: number // vigente - reservado
   expired: number
 }
@@ -84,5 +113,3 @@ export type SaleResult = {
     qty: number
   }[]
 }
-
-

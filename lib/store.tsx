@@ -1,11 +1,12 @@
 'use client'
 
 // =============================================================
-// Gestock · Estado de la aplicación (Sprint 1 & Sprint 2)
+// Gestock · Estado de la aplicación
 // HU-01 Login · HU-02 Registrar producto · HU-03 Gestionar producto
 // HU-04 Entrada de mercadería · HU-05 Punto de venta (FEFO)
 // HU-07 Consultar stock actual · HU-08 Alertas de stock
 // HU-09 Lotes próximos a vencer y vencidos · HU-10 Dashboard de inventario
+// HU-11 Catálogo web · HU-12 Carrito de reserva · HU-13 Ajuste de inventario · HU-14 Reservas
 // =============================================================
 
 import {
@@ -16,7 +17,7 @@ import {
   type ReactNode,
 } from 'react'
 import { buildInitialState } from './mock-data'
-import { daysUntil } from './format'
+import { daysUntil, hoursFromNowISO } from './format'
 import type {
   ExpiryState,
   Lot,
@@ -24,6 +25,8 @@ import type {
   MovementType,
   Product,
   ProductStatus,
+  Reservation,
+  ReservationItem,
   SaleLine,
   SaleResult,
   StockAlertState,
@@ -31,6 +34,8 @@ import type {
 } from './types'
 
 export const EXPIRY_THRESHOLD_DAYS = 30
+export const RESERVATION_HOURS = 24
+const ACTIVE_RESERVATIONS: Reservation['status'][] = ['pendiente', 'confirmada']
 
 export function lotExpiryState(lot: Lot): ExpiryState {
   if (!lot.expiry) return 'ok'
@@ -86,6 +91,7 @@ type StoreContextValue = {
   products: Product[]
   lots: Lot[]
   movements: Movement[]
+  reservations: Reservation[]
   // selectors
   getProduct: (id: string) => Product | undefined
   getStock: (productId: string) => StockInfo
@@ -107,6 +113,16 @@ type StoreContextValue = {
   retireLot: (lotId: string, reason?: string) => { ok: boolean; error?: string }
   // HU-13: Registrar ajuste de inventario
   registerAdjustment: (input: AdjustmentInput) => { ok: boolean; error?: string }
+  // HU-12 / HU-14 / HU-15: reservas web
+  createReservation: (
+    customer: string,
+    phone: string,
+    note: string,
+    items: ReservationItem[],
+  ) => { ok: boolean; error?: string; code?: string }
+  confirmReservation: (id: string) => void
+  rejectReservation: (id: string) => void
+  expireReservation: (id: string) => void
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
@@ -121,6 +137,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>(initial.products)
   const [lots, setLots] = useState<Lot[]>(initial.lots)
   const [movements, setMovements] = useState<Movement[]>(initial.movements)
+  const [reservations, setReservations] = useState<Reservation[]>(
+    initial.reservations,
+  )
 
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loginAttempts, setLoginAttempts] = useState(0)
@@ -132,8 +151,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const getProductLots = (productId: string) =>
     lots.filter((l) => l.productId === productId)
 
+  // HU-07 / HU-11 / HU-12: Unidades comprometidas por reservas activas
+  const reservedByProduct = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const r of reservations) {
+      if (!ACTIVE_RESERVATIONS.includes(r.status)) continue
+      for (const item of r.items) {
+        map.set(item.productId, (map.get(item.productId) ?? 0) + item.qty)
+      }
+    }
+    return map
+  }, [reservations])
+
   // HU-07: stock disponible = stock físico vigente − stock reservado
-  // HU-09: Lotes vencidos no se consideran disponibles
+  // HU-09 / HU-11: Lotes vencidos no se consideran vendibles ni aumentan disponible
   const getStock = (productId: string): StockInfo => {
     const productLots = lots.filter((l) => l.productId === productId)
     let physical = 0
@@ -144,8 +175,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (lotExpiryState(lot) === 'vencido') expired += lot.quantity
       else vigente += lot.quantity
     }
-    // Las reservas se implementan en Sprint 3 (HU-14). Hasta entonces, 0.
-    const reserved = 0
+    const reserved = reservedByProduct.get(productId) ?? 0
     const available = Math.max(vigente - reserved, 0)
     return { physical, vigente, reserved, available, expired }
   }
@@ -550,6 +580,62 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // ----- HU-12 / HU-14: Gestión de reservas web -----
+  const createReservation = (
+    customer: string,
+    phone: string,
+    note: string,
+    items: ReservationItem[],
+  ) => {
+    if (!customer.trim() || !phone.trim()) {
+      return { ok: false, error: 'Nombre y teléfono son obligatorios.' }
+    }
+    if (items.length === 0) {
+      return { ok: false, error: 'Tu carrito está vacío.' }
+    }
+    // HU-12 CA-5: Revalidar disponibilidad antes de confirmar
+    for (const item of items) {
+      const stock = getStock(item.productId)
+      if (item.qty > stock.available) {
+        return {
+          ok: false,
+          error: `"${item.name}" ya no tiene ${item.qty} disponibles (disponibles: ${stock.available}). Ajusta tu carrito.`,
+        }
+      }
+    }
+    const code = `RSV-${Math.floor(2050 + Math.random() * 900)}`
+    const total = items.reduce((sum, i) => sum + i.qty * i.price, 0)
+    const reservation: Reservation = {
+      id: uid('r'),
+      code,
+      customer,
+      phone,
+      note,
+      items,
+      total,
+      createdAt: new Date().toISOString(),
+      expiresAt: hoursFromNowISO(RESERVATION_HOURS),
+      status: 'pendiente',
+    }
+    setReservations((prev) => [reservation, ...prev])
+    return { ok: true, code }
+  }
+
+  const confirmReservation = (id: string) =>
+    setReservations((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, status: 'confirmada' } : r)),
+    )
+
+  const rejectReservation = (id: string) =>
+    setReservations((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, status: 'rechazada' } : r)),
+    )
+
+  const expireReservation = (id: string) =>
+    setReservations((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, status: 'expirada' } : r)),
+    )
+
   const value: StoreContextValue = {
     isAuthenticated,
     login,
@@ -559,6 +645,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     products,
     lots,
     movements,
+    reservations,
     getProduct,
     getStock,
     getAlertState: getProductAlertState,
@@ -571,6 +658,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     registerSale,
     retireLot,
     registerAdjustment,
+    createReservation,
+    confirmReservation,
+    rejectReservation,
+    expireReservation,
   }
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

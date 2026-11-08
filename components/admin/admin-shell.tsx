@@ -87,7 +87,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
         {/* Tienda badge */}
         <div className="px-4 py-3">
-          <div className="flex items-center gap-2.5 rounded-lg bg-sidebar-accent/50 p-2.5 text-xs text-sidebar-foreground">
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 rounded-lg bg-sidebar-accent/50 p-2.5 text-xs text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+          >
             <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
               <Store className="size-4" />
             </div>
@@ -95,10 +98,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               <p className="truncate font-semibold text-sidebar-foreground">Bodega Jefrysito</p>
               <div className="flex items-center gap-1.5 text-[11px] text-emerald-400">
                 <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Sistema activo</span>
+                <span>Ver catálogo web ↗</span>
               </div>
             </div>
-          </div>
+          </Link>
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">

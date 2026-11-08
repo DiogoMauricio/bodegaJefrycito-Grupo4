@@ -581,7 +581,7 @@ function AjustesContent() {
                       <TableCell>
                         {prod ? (
                           <div className="flex items-center gap-2">
-                            <ProductThumb product={prod} size="sm" />
+                            <ProductThumb src={prod.image} alt={prod.name} className="size-8" />
                             <span className="text-sm font-medium line-clamp-1">{prod.name}</span>
                           </div>
                         ) : (

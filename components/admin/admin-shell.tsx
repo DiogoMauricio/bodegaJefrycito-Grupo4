@@ -12,6 +12,7 @@ import {
   CalendarClock,
   AlertTriangle,
   FileSpreadsheet,
+  SlidersHorizontal,
   LogOut,
   Menu,
   X,
@@ -37,6 +38,7 @@ const NAV: NavItem[] = [
   { href: '/admin/alertas', label: 'Alertas de stock', icon: AlertTriangle },
   { href: '/admin/vencimientos', label: 'Vencimientos', icon: CalendarClock },
   { href: '/admin/kardex', label: 'Kardex', icon: FileSpreadsheet },
+  { href: '/admin/ajustes', label: 'Ajustes', icon: SlidersHorizontal },
 ]
 
 export function AdminShell({ children }: { children: React.ReactNode }) {

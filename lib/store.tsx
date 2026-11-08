@@ -6,7 +6,7 @@
 // HU-04 Entrada de mercadería · HU-05 Punto de venta (FEFO)
 // HU-07 Consultar stock actual · HU-08 Alertas de stock
 // HU-09 Lotes próximos a vencer y vencidos · HU-10 Dashboard de inventario
-// HU-11 Catálogo web · HU-12 Carrito de reserva · HU-14 Reservas
+// HU-11 Catálogo web · HU-12 Carrito de reserva · HU-13 Ajuste de inventario · HU-14 Reservas
 // =============================================================
 
 import {
@@ -71,6 +71,15 @@ export type EntryInput = {
   voucher: string
 }
 
+// HU-13: Registrar ajuste de inventario
+export type AdjustmentInput = {
+  productId: string
+  lotId?: string | null
+  type: 'incremento' | 'decremento'
+  quantity: number
+  reason: string
+}
+
 type StoreContextValue = {
   // auth (HU-01)
   isAuthenticated: boolean
@@ -102,6 +111,8 @@ type StoreContextValue = {
   registerSale: (lines: SaleLine[]) => SaleResult
   // HU-09: retirar lote por caducidad o merma
   retireLot: (lotId: string, reason?: string) => { ok: boolean; error?: string }
+  // HU-13: Registrar ajuste de inventario
+  registerAdjustment: (input: AdjustmentInput) => { ok: boolean; error?: string }
   // HU-12 / HU-14 / HU-15: reservas web
   createReservation: (
     customer: string,
@@ -424,6 +435,151 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return { ok: true }
   }
 
+  // ----- HU-13: Registrar ajuste de inventario -----
+  const registerAdjustment = (input: AdjustmentInput) => {
+    const product = getProduct(input.productId)
+    if (!product) return { ok: false, error: 'Producto no encontrado.' }
+    if (input.quantity <= 0) return { ok: false, error: 'La cantidad debe ser mayor a 0.' }
+    if (!input.reason.trim()) return { ok: false, error: 'Debe especificar el motivo del ajuste.' }
+
+    const stock = getStock(input.productId)
+    const balanceBefore = stock.physical
+
+    if (input.type === 'decremento') {
+      if (input.quantity > stock.available) {
+        return {
+          ok: false,
+          error: `No puedes decrementar más del stock disponible (${stock.available} unidades).`,
+        }
+      }
+
+      // Si se especificó un lote puntual
+      if (input.lotId && input.lotId !== 'sin-lote') {
+        const targetLot = lots.find((l) => l.id === input.lotId)
+        if (!targetLot) return { ok: false, error: 'Lote no encontrado.' }
+        if (input.quantity > targetLot.quantity) {
+          return {
+            ok: false,
+            error: `El lote ${targetLot.code} solo tiene ${targetLot.quantity} unidades.`,
+          }
+        }
+        setLots((prev) =>
+          prev.map((l) =>
+            l.id === targetLot.id ? { ...l, quantity: l.quantity - input.quantity } : l,
+          ),
+        )
+        setMovements((prev) => [
+          ...prev,
+          buildMovement(
+            input.productId,
+            targetLot.id,
+            targetLot.code,
+            'ajuste',
+            0,
+            input.quantity,
+            Math.max(balanceBefore - input.quantity, 0),
+            `Ajuste (-) · ${input.reason} (Lote ${targetLot.code})`,
+          ),
+        ])
+        return { ok: true }
+      } else {
+        // Reducir de los lotes disponibles
+        let remaining = input.quantity
+        const updatedLots = [...lots]
+        const productLots = updatedLots
+          .filter((l) => l.productId === input.productId && l.quantity > 0)
+          .sort((a, b) => {
+            const da = a.expiry ? new Date(a.expiry).getTime() : Infinity
+            const db = b.expiry ? new Date(b.expiry).getTime() : Infinity
+            return da - db
+          })
+
+        let runningBalance = balanceBefore
+        const newMoves: Movement[] = []
+        for (const lot of productLots) {
+          if (remaining <= 0) break
+          const take = Math.min(lot.quantity, remaining)
+          const idx = updatedLots.findIndex((l) => l.id === lot.id)
+          updatedLots[idx] = { ...lot, quantity: lot.quantity - take }
+          remaining -= take
+          runningBalance -= take
+
+          newMoves.push(
+            buildMovement(
+              input.productId,
+              lot.id,
+              lot.code,
+              'ajuste',
+              0,
+              take,
+              runningBalance,
+              `Ajuste (-) · ${input.reason} (Lote ${lot.code})`,
+            ),
+          )
+        }
+
+        setLots(updatedLots)
+        setMovements((prev) => [...prev, ...newMoves])
+        return { ok: true }
+      }
+    } else {
+      // Incremento
+      if (input.lotId && input.lotId !== 'sin-lote') {
+        const targetLot = lots.find((l) => l.id === input.lotId)
+        if (targetLot) {
+          setLots((prev) =>
+            prev.map((l) =>
+              l.id === targetLot.id ? { ...l, quantity: l.quantity + input.quantity } : l,
+            ),
+          )
+          setMovements((prev) => [
+            ...prev,
+            buildMovement(
+              input.productId,
+              targetLot.id,
+              targetLot.code,
+              'ajuste',
+              input.quantity,
+              0,
+              balanceBefore + input.quantity,
+              `Ajuste (+) · ${input.reason} (Lote ${targetLot.code})`,
+            ),
+          ])
+          return { ok: true }
+        }
+      }
+
+      // Si no hay lote, se crea un nuevo lote de ajuste
+      const adjustLotCode = `AJ-${Math.floor(1000 + Math.random() * 9000)}`
+      const newLot: Lot = {
+        id: uid('l'),
+        productId: input.productId,
+        code: adjustLotCode,
+        quantity: input.quantity,
+        cost: 0,
+        expiry: null,
+        receivedAt: new Date().toISOString(),
+        supplier: 'Ajuste de inventario',
+        voucher: `AJ-${Date.now().toString().slice(-4)}`,
+      }
+      setLots((prev) => [...prev, newLot])
+      setMovements((prev) => [
+        ...prev,
+        buildMovement(
+          input.productId,
+          newLot.id,
+          newLot.code,
+          'ajuste',
+          input.quantity,
+          0,
+          balanceBefore + input.quantity,
+          `Ajuste (+) · ${input.reason} (Lote ${adjustLotCode})`,
+        ),
+      ])
+      return { ok: true }
+    }
+  }
+
   // ----- HU-12 / HU-14: Gestión de reservas web -----
   const createReservation = (
     customer: string,
@@ -501,6 +657,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     registerEntry,
     registerSale,
     retireLot,
+    registerAdjustment,
     createReservation,
     confirmReservation,
     rejectReservation,

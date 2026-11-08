@@ -28,6 +28,7 @@ import {
   PackagePlus,
   PackageX,
   ShieldAlert,
+  SlidersHorizontal,
   Sparkles,
   TrendingUp,
   Warehouse,
@@ -214,6 +215,12 @@ export default function AdminDashboardPage() {
             <Button size="sm" variant="outline" className="gap-1.5 bg-white shadow-xs">
               <FileSpreadsheet className="size-4 text-blue-600" />
               Kardex
+            </Button>
+          </Link>
+          <Link href="/admin/ajustes">
+            <Button size="sm" variant="outline" className="gap-1.5 bg-white shadow-xs">
+              <SlidersHorizontal className="size-4 text-amber-600" />
+              Ajustes
             </Button>
           </Link>
           <Link href="/admin/inventario">

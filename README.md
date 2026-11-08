@@ -35,9 +35,13 @@ Abrir http://localhost:3000. Credenciales demo: usuario `admin` / contraseña `g
 
 Al agregar una página nueva, registrarla en el menú: `components/admin/admin-shell.tsx` → arreglo `NAV`.
 
-## Sprint 3 — Gestión de Reservas Web (EP3) ⏳
+## Sprint 3 — Gestión de Reservas Web y Ajustes (EP3) ⏳
 
-HU-11 Catálogo web · HU-12 Carrito de reserva · HU-13 Ajuste de inventario · HU-14 Registrar reserva web · HU-15 Notificaciones de reservas.
+| HU | Nombre | Dónde está |
+|---|---|---|
+| HU-13 | Registrar ajuste de inventario | `app/admin/ajustes`, `lib/store.tsx` (`registerAdjustment`) |
+
+HU-11 Catálogo web · HU-12 Carrito de reserva · HU-14 Registrar reserva web · HU-15 Notificaciones de reservas.
 
 ## Estructura
 

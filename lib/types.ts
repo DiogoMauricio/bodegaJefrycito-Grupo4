@@ -58,12 +58,17 @@ export type ReservationStatus =
   | 'confirmada'
   | 'rechazada'
   | 'expirada'
+  | 'atendida'
 
 export type ReservationItem = {
   productId: string
   name: string
   qty: number
   price: number
+  // Aliases opcionales para compatibilidad
+  productName?: string
+  quantity?: number
+  unitPrice?: number
 }
 
 export type Reservation = {
@@ -77,6 +82,13 @@ export type Reservation = {
   createdAt: string
   expiresAt: string
   status: ReservationStatus
+  statusUpdatedAt?: string
+  rejectionReason?: string
+  // Aliases opcionales para compatibilidad
+  clientName?: string
+  clientPhone?: string
+  clientEmail?: string
+  notes?: string
 }
 
 export type CartItem = {
@@ -88,7 +100,7 @@ export type CartItem = {
 export type StockInfo = {
   physical: number // todas las unidades existentes
   vigente: number // unidades no vencidas
-  reserved: number // unidades comprometidas por reservas activas
+  reserved: number // unidades comprometidas por reservas activas (HU-14)
   available: number // vigente - reservado
   expired: number
 }

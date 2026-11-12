@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Lock, User } from 'lucide-react'
+import { ArrowLeft, Lock, Store, User } from 'lucide-react'
 import { useStore } from '@/lib/store'
 import { GestockLogo } from '@/components/gestock-logo'
 import { Button } from '@/components/ui/button'
@@ -28,8 +29,15 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <header className="flex items-center justify-between px-5 py-4 sm:px-8">
+      <header className="flex items-center justify-between px-5 py-4 sm:px-8 border-b border-border/60 bg-white">
         <GestockLogo />
+        <Link
+          href="/"
+          className="text-xs font-semibold text-primary hover:underline flex items-center gap-1.5"
+        >
+          <ArrowLeft className="size-3.5" />
+          <span>Volver al Catálogo Público</span>
+        </Link>
       </header>
 
       <main className="flex flex-1 items-center justify-center px-4 py-10">

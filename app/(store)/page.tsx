@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Search, Plus, Check } from 'lucide-react'
+import { Search, BookmarkCheck, ShoppingBag } from 'lucide-react'
 import { useStore } from '@/lib/store'
 import { useCart } from '@/lib/cart'
 import { formatCurrency } from '@/lib/format'
@@ -12,12 +12,16 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { DirectReservationDialog } from '@/components/store/direct-reservation-dialog'
+import type { Product } from '@/lib/types'
 
 export default function CatalogPage() {
   const { products, getStock } = useStore()
   const { items, add } = useCart()
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('Todas')
+  const [selectedProductForReserve, setSelectedProductForReserve] = useState<Product | null>(null)
+  const [isReserveModalOpen, setIsReserveModalOpen] = useState(false)
 
   // HU-11 CA-1: Solo productos activos se muestran en el catálogo
   const catalog = useMemo(
@@ -52,6 +56,12 @@ export default function CatalogPage() {
     }
     add(productId)
     toast.success(`"${name}" agregado al carrito de reserva.`)
+  }
+
+  // HU-14: Abrir reserva web directa para apartar stock inmediatamente
+  function handleOpenReserve(product: Product) {
+    setSelectedProductForReserve(product)
+    setIsReserveModalOpen(true)
   }
 
   return (
@@ -145,27 +155,37 @@ export default function CatalogPage() {
                   )}
                 </div>
 
-                {/* HU-11 CA-2 & CA-3: Habilitado si hay stock disponible, deshabilitado si está agotado */}
-                <Button
-                  className="mt-4 w-full shadow-2xs font-medium"
-                  variant={soldOut ? 'outline' : inCart > 0 ? 'secondary' : 'default'}
-                  disabled={soldOut}
-                  onClick={() => handleAdd(product.id, product.name)}
-                >
-                  {soldOut ? (
-                    'Agotado'
-                  ) : inCart > 0 ? (
-                    <>
-                      <Check className="size-4 mr-1 text-emerald-600" />
-                      En carrito ({inCart})
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="size-4 mr-1" />
-                      Reservar
-                    </>
-                  )}
-                </Button>
+                {/* Acciones del producto: Reserva directa (HU-14) y Carrito (HU-12) */}
+                <div className="mt-4 flex items-center gap-2">
+                  <Button
+                    className="flex-1 font-semibold shadow-xs"
+                    variant={soldOut ? 'outline' : 'default'}
+                    disabled={soldOut}
+                    onClick={() => handleOpenReserve(product)}
+                  >
+                    <BookmarkCheck className="size-4 mr-1.5" />
+                    {soldOut ? 'Agotado' : 'Reservar'}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    title={inCart > 0 ? `En carrito de reserva: ${inCart} unidad(es)` : 'Agregar al carrito'}
+                    disabled={soldOut}
+                    className={cn(
+                      'size-9 shrink-0 transition-colors bg-white',
+                      inCart > 0 && 'border-primary text-primary bg-primary/10 font-bold',
+                    )}
+                    onClick={() => handleAdd(product.id, product.name)}
+                  >
+                    {inCart > 0 ? (
+                      <span className="text-xs font-bold text-primary">{inCart}</span>
+                    ) : (
+                      <ShoppingBag className="size-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )
@@ -177,6 +197,13 @@ export default function CatalogPage() {
           No se encontraron productos disponibles en esta categoría o búsqueda.
         </div>
       )}
+
+      {/* Modal interactivo de confirmación de reserva web (HU-14 Llamocca) */}
+      <DirectReservationDialog
+        product={selectedProductForReserve}
+        open={isReserveModalOpen}
+        onOpenChange={setIsReserveModalOpen}
+      />
     </main>
   )
 }

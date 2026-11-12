@@ -4,9 +4,10 @@
 // Gestock · Estado de la aplicación
 // HU-01 Login · HU-02 Registrar producto · HU-03 Gestionar producto
 // HU-04 Entrada de mercadería · HU-05 Punto de venta (FEFO)
-// HU-07 Consultar stock actual · HU-08 Alertas de stock
+// HU-06 Kardex · HU-07 Consultar stock actual · HU-08 Alertas de stock
 // HU-09 Lotes próximos a vencer y vencidos · HU-10 Dashboard de inventario
-// HU-11 Catálogo web · HU-12 Carrito de reserva · HU-13 Ajuste de inventario · HU-14 Reservas
+// HU-11 Catálogo web · HU-12 Carrito de reserva · HU-13 Ajuste de inventario
+// HU-14 Registrar reserva web · HU-15 Notificaciones de reservas
 // =============================================================
 
 import {
@@ -14,6 +15,7 @@ import {
   useContext,
   useMemo,
   useState,
+  useEffect,
   type ReactNode,
 } from 'react'
 import { buildInitialState } from './mock-data'
@@ -27,6 +29,7 @@ import type {
   ProductStatus,
   Reservation,
   ReservationItem,
+  ReservationStatus,
   SaleLine,
   SaleResult,
   StockAlertState,
@@ -34,8 +37,7 @@ import type {
 } from './types'
 
 export const EXPIRY_THRESHOLD_DAYS = 30
-export const RESERVATION_HOURS = 24
-const ACTIVE_RESERVATIONS: Reservation['status'][] = ['pendiente', 'confirmada']
+const ACTIVE_RESERVATIONS: ReservationStatus[] = ['pendiente', 'confirmada']
 
 export function lotExpiryState(lot: Lot): ExpiryState {
   if (!lot.expiry) return 'ok'
@@ -98,6 +100,7 @@ type StoreContextValue = {
   getAlertState: (productId: string) => StockAlertState
   lotExpiryState: (lot: Lot) => ExpiryState
   getProductLots: (productId: string) => Lot[]
+  getReservation: (idOrCode: string) => Reservation | undefined
   // product actions (HU-02 / HU-03)
   addProduct: (input: ProductInput) => { ok: boolean; error?: string }
   updateProduct: (
@@ -113,16 +116,18 @@ type StoreContextValue = {
   retireLot: (lotId: string, reason?: string) => { ok: boolean; error?: string }
   // HU-13: Registrar ajuste de inventario
   registerAdjustment: (input: AdjustmentInput) => { ok: boolean; error?: string }
-  // HU-12 / HU-14 / HU-15: reservas web
+  // HU-12 / HU-14 / HU-15: reservas web y notificaciones
   createReservation: (
     customer: string,
     phone: string,
     note: string,
     items: ReservationItem[],
-  ) => { ok: boolean; error?: string; code?: string }
-  confirmReservation: (id: string) => void
-  rejectReservation: (id: string) => void
-  expireReservation: (id: string) => void
+  ) => { ok: boolean; error?: string; code?: string; reservation?: Reservation }
+  confirmReservation: (id: string) => { ok: boolean; error?: string }
+  rejectReservation: (id: string, reason?: string) => { ok: boolean; error?: string }
+  expireReservation: (id: string) => { ok: boolean; error?: string }
+  processExpiredReservations: () => number
+  attendReservation: (id: string) => SaleResult
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
@@ -151,13 +156,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const getProductLots = (productId: string) =>
     lots.filter((l) => l.productId === productId)
 
-  // HU-07 / HU-11 / HU-12: Unidades comprometidas por reservas activas
+  const getReservation = (idOrCode: string) =>
+    reservations.find(
+      (r) => r.id === idOrCode || r.code.toUpperCase() === idOrCode.toUpperCase(),
+    )
+
+  // HU-07 / HU-11 / HU-12 / HU-14: Unidades comprometidas por reservas activas
   const reservedByProduct = useMemo(() => {
     const map = new Map<string, number>()
     for (const r of reservations) {
       if (!ACTIVE_RESERVATIONS.includes(r.status)) continue
       for (const item of r.items) {
-        map.set(item.productId, (map.get(item.productId) ?? 0) + item.qty)
+        const q = item.qty ?? item.quantity ?? 0
+        map.set(item.productId, (map.get(item.productId) ?? 0) + q)
       }
     }
     return map
@@ -325,13 +336,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return { ok: false, error: 'El ticket de venta no contiene productos.' }
     }
 
-    // Validación previa de todos los productos en el ticket
     for (const line of lines) {
       const product = getProduct(line.productId)
       if (!product) {
         return { ok: false, error: 'Producto no encontrado.' }
       }
-      // Criterio 4: Si el producto está inactivo, bloquea su venta
       if (product.status !== 'activo') {
         return { ok: false, error: `"${product.name}" está inactivo y no se puede vender.` }
       }
@@ -339,7 +348,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return { ok: false, error: `Cantidad inválida para "${product.name}".` }
       }
       const stock = getStock(line.productId)
-      // Criterio 2 y 3: Validar contra stock disponible (físico vigente - reservado)
       if (line.qty > stock.available) {
         return {
           ok: false,
@@ -357,8 +365,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const product = getProduct(line.productId)!
       let remaining = line.qty
 
-      // Criterio 4 y 5: FEFO (First Expired, First Out)
-      // Solo lotes vigentes (no vencidos), ordenados por fecha de vencimiento más próxima
       const vigenteLots = updatedLots
         .filter(
           (l) =>
@@ -453,7 +459,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Si se especificó un lote puntual
       if (input.lotId && input.lotId !== 'sin-lote') {
         const targetLot = lots.find((l) => l.id === input.lotId)
         if (!targetLot) return { ok: false, error: 'Lote no encontrado.' }
@@ -483,7 +488,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ])
         return { ok: true }
       } else {
-        // Reducir de los lotes disponibles
         let remaining = input.quantity
         const updatedLots = [...lots]
         const productLots = updatedLots
@@ -549,7 +553,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Si no hay lote, se crea un nuevo lote de ajuste
       const adjustLotCode = `AJ-${Math.floor(1000 + Math.random() * 9000)}`
       const newLot: Lot = {
         id: uid('l'),
@@ -559,7 +562,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         cost: 0,
         expiry: null,
         receivedAt: new Date().toISOString(),
-        supplier: 'Ajuste de inventario',
+        supplier: 'Ajuste interno',
         voucher: `AJ-${Date.now().toString().slice(-4)}`,
       }
       setLots((prev) => [...prev, newLot])
@@ -596,45 +599,254 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // HU-12 CA-5: Revalidar disponibilidad antes de confirmar
     for (const item of items) {
       const stock = getStock(item.productId)
-      if (item.qty > stock.available) {
+      const q = item.qty ?? item.quantity ?? 1
+      if (q > stock.available) {
         return {
           ok: false,
-          error: `"${item.name}" ya no tiene ${item.qty} disponibles (disponibles: ${stock.available}). Ajusta tu carrito.`,
+          error: `"${item.name || item.productName}" ya no tiene ${q} disponibles (disponibles: ${stock.available}). Ajusta tu carrito.`,
         }
       }
     }
     const code = `RSV-${Math.floor(2050 + Math.random() * 900)}`
-    const total = items.reduce((sum, i) => sum + i.qty * i.price, 0)
+    const total = items.reduce(
+      (sum, i) => sum + (i.qty ?? i.quantity ?? 1) * (i.price ?? i.unitPrice ?? 0),
+      0,
+    )
+
+    const normalizedItems: ReservationItem[] = items.map((it) => {
+      const q = it.qty ?? it.quantity ?? 1
+      const p = it.price ?? it.unitPrice ?? 0
+      const n = it.name || it.productName || ''
+      return {
+        productId: it.productId,
+        name: n,
+        productName: n,
+        qty: q,
+        quantity: q,
+        price: p,
+        unitPrice: p,
+      }
+    })
+
     const reservation: Reservation = {
       id: uid('r'),
       code,
-      customer,
-      phone,
-      note,
-      items,
+      customer: customer.trim(),
+      clientName: customer.trim(),
+      phone: phone.trim(),
+      clientPhone: phone.trim(),
+      note: note.trim(),
+      notes: note.trim(),
+      items: normalizedItems,
       total,
       createdAt: new Date().toISOString(),
-      expiresAt: hoursFromNowISO(RESERVATION_HOURS),
+      expiresAt: hoursFromNowISO(24),
       status: 'pendiente',
     }
+
+    // Movimientos de tipo reserva para trazabilidad
+    const newMovements: Movement[] = normalizedItems.map((it) => {
+      const stock = getStock(it.productId)
+      return buildMovement(
+        it.productId,
+        null,
+        null,
+        'reserva',
+        0,
+        it.qty,
+        stock.physical,
+        `Apartado web ${code} (${reservation.customer})`,
+      )
+    })
+
     setReservations((prev) => [reservation, ...prev])
-    return { ok: true, code }
+    setMovements((prev) => [...prev, ...newMovements])
+    return { ok: true, code, reservation }
   }
 
-  const confirmReservation = (id: string) =>
+  // HU-15 Criterio 2: Confirmar reserva -> "Confirmada para recojo"
+  const confirmReservation = (id: string) => {
+    const res = reservations.find((r) => r.id === id)
+    if (!res) return { ok: false, error: 'Reserva no encontrada.' }
+    if (res.status !== 'pendiente') {
+      return { ok: false, error: `No se puede confirmar una reserva en estado "${res.status}".` }
+    }
+
     setReservations((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: 'confirmada' } : r)),
+      prev.map((r) =>
+        r.id === id
+          ? {
+              ...r,
+              status: 'confirmada',
+              statusUpdatedAt: new Date().toISOString(),
+            }
+          : r,
+      ),
+    )
+    return { ok: true }
+  }
+
+  // HU-15 Criterio 3: Rechazar reserva -> "Rechazada" y libera las unidades
+  const rejectReservation = (id: string, reason?: string) => {
+    const res = reservations.find((r) => r.id === id)
+    if (!res) return { ok: false, error: 'Reserva no encontrada.' }
+    if (res.status === 'rechazada' || res.status === 'expirada' || res.status === 'atendida') {
+      return { ok: false, error: `La reserva ya fue finalizada como "${res.status}".` }
+    }
+
+    const releaseMovements = res.items.map((it) => {
+      const stock = getStock(it.productId)
+      return buildMovement(
+        it.productId,
+        null,
+        null,
+        'liberacion',
+        it.qty ?? it.quantity ?? 1,
+        0,
+        stock.physical,
+        `Liberación por rechazo de reserva ${res.code}`,
+      )
+    })
+
+    setReservations((prev) =>
+      prev.map((r) =>
+        r.id === id
+          ? {
+              ...r,
+              status: 'rechazada',
+              rejectionReason: reason || 'Rechazada por la administración',
+              statusUpdatedAt: new Date().toISOString(),
+            }
+          : r,
+      ),
+    )
+    setMovements((prev) => [...prev, ...releaseMovements])
+    return { ok: true }
+  }
+
+  // HU-14 Criterio 3 & HU-15 Criterio 4: Expirar reserva (24h) y liberar unidades
+  const expireReservation = (id: string) => {
+    const res = reservations.find((r) => r.id === id)
+    if (!res) return { ok: false, error: 'Reserva no encontrada.' }
+    if (res.status !== 'pendiente' && res.status !== 'confirmada') {
+      return { ok: false, error: `La reserva ya se encuentra en estado "${res.status}".` }
+    }
+
+    const releaseMovements = res.items.map((it) => {
+      const stock = getStock(it.productId)
+      return buildMovement(
+        it.productId,
+        null,
+        null,
+        'liberacion',
+        it.qty ?? it.quantity ?? 1,
+        0,
+        stock.physical,
+        `Liberación por vencimiento de 24h · Reserva ${res.code}`,
+      )
+    })
+
+    setReservations((prev) =>
+      prev.map((r) =>
+        r.id === id
+          ? {
+              ...r,
+              status: 'expirada',
+              statusUpdatedAt: new Date().toISOString(),
+            }
+          : r,
+      ),
+    )
+    setMovements((prev) => [...prev, ...releaseMovements])
+    return { ok: true }
+  }
+
+  // Procesar vencimiento automático de reservas que superaron las 24 horas
+  const processExpiredReservations = (): number => {
+    const nowTime = Date.now()
+    const expiredList = reservations.filter(
+      (r) =>
+        (r.status === 'pendiente' || r.status === 'confirmada') &&
+        new Date(r.expiresAt).getTime() <= nowTime,
     )
 
-  const rejectReservation = (id: string) =>
+    if (expiredList.length === 0) return 0
+
+    const newMovements: Movement[] = []
+    for (const res of expiredList) {
+      for (const it of res.items) {
+        const stock = getStock(it.productId)
+        newMovements.push(
+          buildMovement(
+            it.productId,
+            null,
+            null,
+            'liberacion',
+            it.qty ?? it.quantity ?? 1,
+            0,
+            stock.physical,
+            `Liberación automática (24h superadas) · Reserva ${res.code}`,
+          ),
+        )
+      }
+    }
+
     setReservations((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: 'rechazada' } : r)),
+      prev.map((r) => {
+        if (
+          (r.status === 'pendiente' || r.status === 'confirmada') &&
+          new Date(r.expiresAt).getTime() <= nowTime
+        ) {
+          return {
+            ...r,
+            status: 'expirada',
+            statusUpdatedAt: new Date().toISOString(),
+          }
+        }
+        return r
+      }),
     )
 
-  const expireReservation = (id: string) =>
+    setMovements((prev) => [...prev, ...newMovements])
+    return expiredList.length
+  }
+
+  // Entregar y atender reserva en mostrador (convierte reserva en venta efectiva con FEFO)
+  const attendReservation = (id: string): SaleResult => {
+    const res = reservations.find((r) => r.id === id)
+    if (!res) return { ok: false, error: 'Reserva no encontrada.' }
+    if (res.status !== 'confirmada' && res.status !== 'pendiente') {
+      return { ok: false, error: `Solo se pueden entregar reservas en estado pendiente o confirmada.` }
+    }
+
+    const saleLines: SaleLine[] = res.items.map((it) => ({
+      productId: it.productId,
+      qty: it.qty ?? it.quantity ?? 1,
+    }))
+
     setReservations((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: 'expirada' } : r)),
+      prev.map((r) =>
+        r.id === id
+          ? {
+              ...r,
+              status: 'atendida',
+              statusUpdatedAt: new Date().toISOString(),
+            }
+          : r,
+      ),
     )
+
+    const saleResult = registerSale(saleLines)
+    return saleResult
+  }
+
+  // Chequeo periódico de reservas vencidas cada minuto
+  useEffect(() => {
+    const timer = setInterval(() => {
+      processExpiredReservations()
+    }, 60_000)
+    return () => clearInterval(timer)
+  }, [reservations])
 
   const value: StoreContextValue = {
     isAuthenticated,
@@ -651,6 +863,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     getAlertState: getProductAlertState,
     lotExpiryState,
     getProductLots,
+    getReservation,
     addProduct,
     updateProduct,
     setProductStatus,
@@ -662,6 +875,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     confirmReservation,
     rejectReservation,
     expireReservation,
+    processExpiredReservations,
+    attendReservation,
   }
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

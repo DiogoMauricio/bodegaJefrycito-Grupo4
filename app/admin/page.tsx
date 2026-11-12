@@ -55,7 +55,7 @@ import {
 } from '@/components/ui/table'
 
 export default function AdminDashboardPage() {
-  const { products, lots, getStock } = useStore()
+  const { products, lots, getStock, reservations } = useStore()
 
   // 1. Cálculos de indicadores principales
   const metrics = useMemo(() => {
@@ -160,6 +160,11 @@ export default function AdminDashboardPage() {
     const pctVigente = totalUnidadesFisicas > 0 ? Math.round((totalUnidadesVigentes / totalUnidadesFisicas) * 100) : 0
     const pctVencido = totalUnidadesFisicas > 0 ? Math.round((totalUnidadesVencidas / totalUnidadesFisicas) * 100) : 0
 
+    const reservasActivas = reservations.filter(
+      (r) => r.status === 'pendiente' || r.status === 'confirmada',
+    )
+    const reservasActivasCount = reservasActivas.length
+
     return {
       agotados,
       bajo,
@@ -168,6 +173,7 @@ export default function AdminDashboardPage() {
       totalUnidadesVigentes,
       totalUnidadesVencidas,
       totalReservas,
+      reservasActivasCount,
       valorTotalCosto,
       valorTotalVenta,
       lotesProximos,
@@ -181,7 +187,7 @@ export default function AdminDashboardPage() {
       pctVigente,
       pctVencido,
     }
-  }, [products, lots, getStock])
+  }, [products, lots, getStock, reservations])
 
   return (
     <div className="space-y-6">
@@ -221,6 +227,12 @@ export default function AdminDashboardPage() {
             <Button size="sm" variant="outline" className="gap-1.5 bg-white shadow-xs">
               <SlidersHorizontal className="size-4 text-amber-600" />
               Ajustes
+            </Button>
+          </Link>
+          <Link href="/admin/reservas">
+            <Button size="sm" variant="outline" className="gap-1.5 bg-white shadow-xs">
+              <BookmarkCheck className="size-4 text-violet-600" />
+              Reservas ({metrics.reservasActivasCount})
             </Button>
           </Link>
           <Link href="/admin/inventario">
@@ -412,7 +424,7 @@ export default function AdminDashboardPage() {
         </Link>
 
         {/* 5. Reservas activas */}
-        <Link href="/admin/inventario?estado=reservas" className="group">
+        <Link href="/admin/reservas" className="group">
           <Card className="h-full overflow-hidden border border-slate-200 transition-all duration-200 hover:-translate-y-1 hover:border-violet-400 hover:shadow-md bg-white">
             <div className="h-1.5 w-full bg-violet-600" />
             <CardContent className="flex flex-col justify-between p-4 h-[calc(100%-6px)]">
@@ -427,15 +439,15 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="my-2.5">
                   <p className="text-3xl font-extrabold tabular-nums text-violet-800">
-                    {metrics.totalReservas}
+                    {metrics.reservasActivasCount}
                   </p>
                   <p className="text-[11px] text-muted-foreground font-medium">
-                    Comprometidas
+                    {metrics.totalReservas} und. comprometidas
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-1 text-[11px] font-semibold text-violet-800 transition-colors group-hover:text-violet-900 pt-2 border-t border-slate-100">
-                <span>Ver pedidos</span>
+                <span>Gestionar pedidos</span>
                 <ArrowRight className="size-3 transition-transform group-hover:translate-x-1" />
               </div>
             </CardContent>

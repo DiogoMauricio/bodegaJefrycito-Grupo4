@@ -1,9 +1,12 @@
 import {
   AlertOctagon,
   AlertTriangle,
+  BookmarkCheck,
   CheckCircle2,
   Clock,
+  PackageCheck,
   ShieldAlert,
+  XCircle,
   Zap,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -12,6 +15,7 @@ import type {
   ExpiryState,
   MovementType,
   ProductStatus,
+  ReservationStatus,
   StockAlertState,
 } from '@/lib/types'
 
@@ -121,7 +125,6 @@ export function LotAvailabilityBadge({ state }: { state: ExpiryState }) {
   )
 }
 
-
 export function StockStatusBadge({ alert }: { alert: StockAlertState }) {
   if (alert === 'agotado') {
     return (
@@ -142,4 +145,45 @@ export function StockStatusBadge({ alert }: { alert: StockAlertState }) {
       En stock
     </span>
   )
+}
+
+// HU-14 / HU-15: Insignias de estado de reserva
+export function ReservationStatusBadge({ status }: { status: ReservationStatus }) {
+  switch (status) {
+    case 'pendiente':
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-900 shadow-2xs">
+          <Clock className="size-3 shrink-0 text-amber-700" />
+          Pendiente de preparación
+        </span>
+      )
+    case 'confirmada':
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-300 bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-800 shadow-2xs">
+          <BookmarkCheck className="size-3 shrink-0 text-sky-600" />
+          Confirmada para recojo
+        </span>
+      )
+    case 'atendida':
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 shadow-2xs">
+          <PackageCheck className="size-3 shrink-0 text-emerald-600" />
+          Entregada y cobrada
+        </span>
+      )
+    case 'rechazada':
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-red-300 bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700 shadow-2xs">
+          <XCircle className="size-3 shrink-0 text-red-600" />
+          Rechazada (Stock liberado)
+        </span>
+      )
+    case 'expirada':
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 shadow-2xs">
+          <AlertOctagon className="size-3 shrink-0 text-slate-500" />
+          Expirada (24h superadas)
+        </span>
+      )
+  }
 }

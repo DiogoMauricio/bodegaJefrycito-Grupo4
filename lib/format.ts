@@ -46,3 +46,31 @@ export function hoursFromNowISO(hours: number): string {
   d.setHours(d.getHours() + hours)
   return d.toISOString()
 }
+
+/** Tiempo restante para vigencia de 24h de reservas */
+export function timeRemaining(expiresAtIso: string | null): {
+  text: string
+  isExpired: boolean
+  minutes: number
+} {
+  if (!expiresAtIso) return { text: '—', isExpired: false, minutes: 0 }
+  const diffMs = new Date(expiresAtIso).getTime() - Date.now()
+  if (diffMs <= 0) {
+    const expiredMinutesAgo = Math.round(Math.abs(diffMs) / 60000)
+    const hours = Math.floor(expiredMinutesAgo / 60)
+    const mins = expiredMinutesAgo % 60
+    return {
+      text: hours > 0 ? `Expiró hace ${hours}h ${mins}m` : `Expiró hace ${mins}m`,
+      isExpired: true,
+      minutes: -expiredMinutesAgo,
+    }
+  }
+  const remainingMinutes = Math.round(diffMs / 60000)
+  const hours = Math.floor(remainingMinutes / 60)
+  const mins = remainingMinutes % 60
+  return {
+    text: hours > 0 ? `${hours}h ${mins}m restantes` : `${mins}m restantes`,
+    isExpired: false,
+    minutes: remainingMinutes,
+  }
+}

@@ -151,6 +151,20 @@ function InventarioContent() {
         >
           Con unidades vencidas ({counts.conVencidos})
         </Button>
+        <Button
+          size="sm"
+          variant={filterEstado === 'reservas' ? 'default' : 'outline'}
+          onClick={() => setFilterEstado('reservas')}
+          className={
+            filterEstado === 'reservas'
+              ? 'bg-violet-700 text-white hover:bg-violet-800'
+              : counts.conReservas > 0
+                ? 'border-violet-200 text-violet-800 hover:bg-violet-50'
+                : ''
+          }
+        >
+          Con unidades reservadas ({counts.conReservas})
+        </Button>
       </div>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-4">

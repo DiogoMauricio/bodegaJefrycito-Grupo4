@@ -1,4 +1,3 @@
-const stockDisponible: number = "veinte";
+const stockDisponible: number = 20;
 
 console.log(stockDisponible);
-

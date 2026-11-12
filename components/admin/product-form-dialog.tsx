@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { toast } from 'sonner'
+import { ImageIcon, Upload, X } from 'lucide-react'
 import { useStore } from '@/lib/store'
 import type { Product } from '@/lib/types'
 import { Button } from '@/components/ui/button'
@@ -51,6 +52,8 @@ export function ProductFormDialog({ open, onOpenChange, product }: Props) {
   const [salePrice, setSalePrice] = useState('')
   const [minStock, setMinStock] = useState('')
   const [status, setStatus] = useState<Product['status']>('activo')
+  const [image, setImage] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -61,7 +64,28 @@ export function ProductFormDialog({ open, onOpenChange, product }: Props) {
     setSalePrice(product ? String(product.salePrice) : '')
     setMinStock(product ? String(product.minStock) : '')
     setStatus(product?.status ?? 'activo')
+    setImage(product?.image ?? '')
   }, [open, product])
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Por favor selecciona un archivo de imagen válido')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('La imagen no debe superar los 2MB')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      if (typeof event.target?.result === 'string') {
+        setImage(event.target.result)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -75,6 +99,7 @@ export function ProductFormDialog({ open, onOpenChange, product }: Props) {
         salePrice: priceNum,
         minStock: minNum,
         status,
+        image,
       })
       if (!res.ok) return toast.error(res.error)
       toast.success('Producto actualizado. El historial se mantiene intacto.')
@@ -90,7 +115,7 @@ export function ProductFormDialog({ open, onOpenChange, product }: Props) {
       salePrice: priceNum,
       minStock: minNum,
       status: 'activo',
-      image: '',
+      image,
     })
     if (!res.ok) return toast.error(res.error)
     toast.success('Producto registrado. Stock físico y disponible inician en 0.')
@@ -222,6 +247,82 @@ export function ProductFormDialog({ open, onOpenChange, product }: Props) {
               </Select>
             </div>
           )}
+
+          {/* Imagen del producto (HU-02 / HU-03) */}
+          <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Imagen del producto (opcional)
+            </Label>
+            <div className="flex items-start gap-3 pt-1">
+              {/* Preview */}
+              <div className="relative flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-white shadow-2xs">
+                {image ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={image}
+                      alt="Vista previa"
+                      className="size-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setImage('')}
+                      className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
+                      title="Quitar imagen"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </>
+                ) : (
+                  <ImageIcon className="size-7 text-muted-foreground/40" />
+                )}
+              </div>
+
+              {/* Controles de URL y Subir archivo */}
+              <div className="min-w-0 flex-1 space-y-2">
+                <Input
+                  placeholder="Pegar URL de la imagen (https://...)"
+                  value={image.startsWith('data:') ? 'Imagen cargada desde archivo local' : image}
+                  onChange={(e) => setImage(e.target.value)}
+                  disabled={image.startsWith('data:')}
+                  className="h-8 text-xs"
+                />
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageFileChange}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1.5 text-xs bg-white"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="size-3" />
+                    Subir foto
+                  </Button>
+                  {image && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-muted-foreground hover:text-red-500"
+                      onClick={() => setImage('')}
+                    >
+                      Quitar
+                    </Button>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  JPG, PNG o WebP (máx. 2MB) o enlace URL directo.
+                </p>
+              </div>
+            </div>
+          </div>
 
           <DialogFooter>
             <Button

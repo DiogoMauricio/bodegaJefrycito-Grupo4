@@ -36,3 +36,8 @@ jobs:
 
       - name: Ejecutar pruebas
         run: npm test
+
+      - name: Auditoría de vulnerabilidades de seguridad (npm audit)
+        run: |
+          echo "=== Escaneo de seguridad de dependencias (SCA) ==="
+          npm audit || true

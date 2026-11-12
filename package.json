@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "security:audit": "npm audit"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
@@ -18,7 +19,7 @@
     "cn": "^0.3.0",
     "lucide-react": "^1.16.0",
     "mammoth": "^1.12.3",
-    "next": "16.3.3",
+    "next": "^16.4.6",
     "next-themes": "^0.4.6",
     "react": "^19",
     "react-dom": "^19",

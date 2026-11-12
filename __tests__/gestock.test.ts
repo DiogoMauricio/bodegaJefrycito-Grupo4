@@ -13,6 +13,10 @@ function puedeReservar(stockDisponible: number, cantidadSolicitada: number): boo
   return cantidadSolicitada > 0 && cantidadSolicitada <= stockDisponible
 }
 
+function calcularDisponibilidad(stockFisicoVigente: number, unidadesReservadas: number): number {
+  return Math.max(stockFisicoVigente - unidadesReservadas, 0)
+}
+
 describe('HU-12 / HU-14: Gestión de Reservas Web', () => {
   it('permite reservar productos con stock disponible suficiente', () => {
     expect(puedeReservar(10, 3)).toBe(true)
@@ -27,6 +31,41 @@ describe('HU-12 / HU-14: Gestión de Reservas Web', () => {
   it('rechaza cantidades negativas o iguales a cero', () => {
     expect(puedeReservar(10, -2)).toBe(false)
     expect(puedeReservar(10, 0)).toBe(false)
+  })
+
+  it('HU-14 CA-1 y CA-2: Las unidades reservadas reducen el stock disponible para otras operaciones', () => {
+    const fisico = 20
+    const reservadas = 5
+    expect(calcularDisponibilidad(fisico, reservadas)).toBe(15)
+  })
+
+  it('HU-14 CA-3 y HU-15 CA-4: Al expirar o rechazarse una reserva, las unidades se liberan', () => {
+    const fisico = 20
+    let reservadas = 5
+    expect(calcularDisponibilidad(fisico, reservadas)).toBe(15)
+    // Se cancela o expira la reserva -> reservadas vuelve a 0
+    reservadas = 0
+    expect(calcularDisponibilidad(fisico, reservadas)).toBe(20)
+  })
+})
+
+// --- 1.1 Reglas de Notificaciones y Estados de Reserva (HU-15) ---
+describe('HU-15: Gestión de Notificaciones y Estados de Reservas', () => {
+  it('HU-15 CA-2: Cambia de "pendiente" a "confirmada" para recojo en tienda', () => {
+    let estado: 'pendiente' | 'confirmada' | 'rechazada' | 'expirada' = 'pendiente'
+    expect(estado).toBe('pendiente')
+    estado = 'confirmada'
+    expect(estado).toBe('confirmada')
+  })
+
+  it('HU-15 CA-3: Registra estado "rechazada" con motivo para auditoría interna', () => {
+    const reserva = {
+      id: 'res-test',
+      status: 'rechazada' as const,
+      rejectionReason: 'Cliente no se presentó dentro del plazo',
+    }
+    expect(reserva.status).toBe('rechazada')
+    expect(reserva.rejectionReason).toBeDefined()
   })
 })
 

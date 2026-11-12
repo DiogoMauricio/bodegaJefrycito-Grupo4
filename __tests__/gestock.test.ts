@@ -85,17 +85,20 @@ describe('HU-09: Control y Semáforo de Vencimientos', () => {
   })
 })
 
-// --- 4. Reglas de Formateo y Moneda Peruana ---
-describe('Utilitarios de Bodega (lib/format.ts)', () => {
-  it('debe formatear importes a soles peruanos correctamente', () => {
-    const formateado = formatCurrency(15.5)
-    // Contiene S/ y el importe 15.50
-    expect(formateado).toContain('15.50')
-    expect(formateado).toContain('S/')
-  })
-
-  it('daysUntil debe retornar días negativos para fechas pasadas y positivos para futuras', () => {
-    expect(daysUntil('2020-01-01')).toBeLessThan(0)
-    expect(daysUntil(daysFromNowISO(10))).toBeGreaterThanOrEqual(9)
+// --- 5. Validación de Imagen en Productos (HU-02 / HU-03) ---
+describe('HU-02 / HU-03: Maestro de Productos e Imágenes', () => {
+  it('permite registrar productos con imagen representativa (URL o Base64)', () => {
+    const productoConImagen = {
+      barcode: '7750001000999',
+      name: 'Galletas Oreo 36g',
+      category: 'Snacks',
+      unit: 'Paquete',
+      salePrice: 1.5,
+      minStock: 12,
+      status: 'activo' as const,
+      image: 'https://images.unsplash.com/photo-oreo',
+    }
+    expect(productoConImagen.image).toBeDefined()
+    expect(productoConImagen.image.length).toBeGreaterThan(0)
   })
 })

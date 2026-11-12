@@ -1,5 +1,5 @@
 
-name: Bot de Pruebas Gestock
+name: Ejecutar pruebas automatizadas
 
 on:
   push:
@@ -29,7 +29,10 @@ jobs:
         run: npm ci
 
       - name: Verificar TypeScript
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: Compilar proyecto
         run: npm run build
+
+      - name: Ejecutar pruebas
+        run: npm test
